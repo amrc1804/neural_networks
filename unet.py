@@ -3,7 +3,7 @@
 
 import torch
 import torch.nn as nn
-import torch.nn.functionas F
+import torch.nn.functional F
 
 class unet(nn.Module):
 
