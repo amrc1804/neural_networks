@@ -4,7 +4,6 @@
 import torch
 import torch.nn as nn
 import torch.nn.functionas F
-import numpy as np
 
 class unet(nn.Module):
 
@@ -80,22 +79,22 @@ class unet(nn.Module):
 		u1 = self.upconv1(c10)
 		
 		#concatenation of previous step of the descent with output of the upconv, core of the unet
-		cc1 = torch.cat(c8, u1, 1)
+		cc1 = torch.cat([c8, u1], 1)
 		c11 = F.relu(self.conv11(cc1))
 		c12 = F.relu(self.conv12(c11))
 		u2 = self.upconv2(c12)
 		
-		cc2 = torch.cat(c6, u2, 1)
+		cc2 = torch.cat([c6, u2], 1)
 		c13 = F.relu(self.conv13(cc2))
 		c14 = F.relu(self.conv14(c13))
 		u3 = self.upconv3(c14)
 		
-		cc3 = torch.cat(c4, u3, 1)
+		cc3 = torch.cat([c4, u3], 1)
 		c15 = F.relu(self.conv15(cc3))
 		c16 = F.relu(self.conv16(c15))
 		u4 = self.upconv4(c16)
 		
-		cc4 = torch.cat(c2, u4, 1)
+		cc4 = torch.cat([c2, u4], 1)
 		c17 = F.relu(self.conv15(cc4))
 		c18 = F.relu(self.conv16(c17))
 		
