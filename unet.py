@@ -3,7 +3,7 @@
 
 import torch
 import torch.nn as nn
-import torch.nn.functional F
+import torch.nn.functional as F
 
 class unet(nn.Module):
 
@@ -12,23 +12,24 @@ class unet(nn.Module):
 		
 		#Contraction step, "descent" of the U shape
 		#parameters of the first Conv2d method:
-			#in_channels = 1, number of channels of the image, here grayscale so 1 but if rbg it's 3
+			#in_channels = 5, number of channels of the input, here we input the concatenation of one rgb image and a 2 channel flow map
 			#out_channels = 64, number of output channels after the convolution, 64 as in the paper, so 64 kernels
 			#kernel_size = 3, 3x3 square (see paper)
-		self.conv1 = nn.Conv2d(1, 64, 3)
-		self.conv2 = nn.Conv2d(64, 64, 3)
+			#padding = 1, to keep the size of the input
+		self.conv1 = nn.Conv2d(5, 64, 3, padding=1)
+		self.conv2 = nn.Conv2d(64, 64, 3, padding=1)
 		#first max pool
-		self.conv3 = nn.Conv2d(64, 128, 3)
-		self.conv4 = nn.Conv2d(128, 128, 3)
+		self.conv3 = nn.Conv2d(64, 128, 3, padding=1)
+		self.conv4 = nn.Conv2d(128, 128, 3, padding=1)
 		#second max pool
-		self.conv5 = nn.Conv2d(128, 256, 3)
-		self.conv6 = nn.Conv2d(256, 256, 3)
+		self.conv5 = nn.Conv2d(128, 256, 3, padding=1)
+		self.conv6 = nn.Conv2d(256, 256, 3, padding=1)
 		#third max pool
-		self.conv7 = nn.Conv2d(256, 512, 3)
-		self.conv8 = nn.Conv2d(512, 512, 3)
+		self.conv7 = nn.Conv2d(256, 512, 3, padding=1)
+		self.conv8 = nn.Conv2d(512, 512, 3, padding=1)
 		#fourth and last max pool
-		self.conv9 = nn.Conv2d(512, 1024, 3)
-		self.conv10 = nn.Conv2d(1024, 1024, 3)
+		self.conv9 = nn.Conv2d(512, 1024, 3, padding=1)
+		self.conv10 = nn.Conv2d(1024, 1024, 3, padding=1)
 		
 		#Expansion step, "ascent" of the U shape
 		#parameters of the first ConvTranspose2d method:
@@ -36,49 +37,50 @@ class unet(nn.Module):
 			#out_channels = 512, in the paper those channels will be concatenated with the 512 channels from the mirrored step of the descent
 			#kernel_size = 2, from the paper
 			#stride = 2, upsampling of the image, size is 2x what is was before
-		self.upconv1 = nn.ConvTranspose2d(1024, 512, 2, 2)
-		self.conv11 = nn.Conv2d(1024, 512, 3)
-		self.conv12 = nn.Conv2d(512, 512, 3)
+			#output_padding = 1, only on first two upconvolution, because last maxpools were on uneven dimensions so we lose 1 pixel
+		self.upconv1 = nn.ConvTranspose2d(1024, 512, 2, 2, output_padding=1)
+		self.conv11 = nn.Conv2d(1024, 512, 3, padding=1)
+		self.conv12 = nn.Conv2d(512, 512, 3, padding=1)
 		
-		self.upconv2 = nn.ConvTranspose2d(512, 256, 2, 2)
-		self.conv13 = nn.Conv2d(512, 256, 3)
-		self.conv14 = nn.Conv2d(256, 256, 3)
+		self.upconv2 = nn.ConvTranspose2d(512, 256, 2, 2, output_padding=1)
+		self.conv13 = nn.Conv2d(512, 256, 3, padding=1)
+		self.conv14 = nn.Conv2d(256, 256, 3, padding=1)
 		
 		self.upconv3 = nn.ConvTranspose2d(256, 128, 2, 2)
-		self.conv15 = nn.Conv2d(256, 128, 3)
-		self.conv16 = nn.Conv2d(128, 128, 3)
+		self.conv15 = nn.Conv2d(256, 128, 3, padding=1)
+		self.conv16 = nn.Conv2d(128, 128, 3, padding=1)
 		
 		self.upconv4 = nn.ConvTranspose2d(128, 64, 2, 2)
-		self.conv17 = nn.Conv2d(128, 64, 3)
-		self.conv18 = nn.Conv2d(64, 64, 3)
+		self.conv17 = nn.Conv2d(128, 64, 3, padding=1)
+		self.conv18 = nn.Conv2d(64, 64, 3, padding=1)
 		
 		#last conv, linear connection pretty much?
-		self.conv19 = nnConv2d(64, 2, 1)
+		self.conv19 = nn.Conv2d(64, 3, 1)
 		
 	def forward(self, input):
 		
 		#Followed the naming from the pytorch doc, c is convolution, s subsampling, u is up-conv etc...
 		c1 = F.relu(self.conv1(input))
 		c2 = F.relu(self.conv2(c1))
-		s1 = F.max_pool2d(c1, (2, 2))
+		s1 = F.max_pool2d(c2, 2, 2)
 		
 		c3 = F.relu(self.conv3(s1))
 		c4 = F.relu(self.conv4(c3))
-		s2 = F.max_pool2d(c4, (2, 2))
+		s2 = F.max_pool2d(c4, 2, 2)
 		
 		c5 = F.relu(self.conv5(s2))
 		c6 = F.relu(self.conv6(c5))
-		s3 = F.max_pool2d(c6, (2, 2))
+		s3 = F.max_pool2d(c6, 2, 2)
 		
 		c7 = F.relu(self.conv7(s3))
 		c8 = F.relu(self.conv8(c7))
-		s4 = F.max_pool2d(c8, (2, 2))
+		s4 = F.max_pool2d(c8, 2, 2)
 	
 		c9 = F.relu(self.conv9(s4))
 		c10 = F.relu(self.conv10(c9))
 		u1 = self.upconv1(c10)
 		
-		#concatenation of previous step of the descent with output of the upconv, core of the unet
+		#concatenation of previous step of the descent with output of the upconv, core of the unet, axis 1 because it's the channel axis (B, C, H, W)
 		cc1 = torch.cat([c8, u1], 1)
 		c11 = F.relu(self.conv11(cc1))
 		c12 = F.relu(self.conv12(c11))
@@ -95,8 +97,8 @@ class unet(nn.Module):
 		u4 = self.upconv4(c16)
 		
 		cc4 = torch.cat([c2, u4], 1)
-		c17 = F.relu(self.conv15(cc4))
-		c18 = F.relu(self.conv16(c17))
+		c17 = F.relu(self.conv17(cc4))
+		c18 = F.relu(self.conv18(c17))
 		
 		output = self.conv19(c18)
 		return output
