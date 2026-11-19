@@ -37,12 +37,11 @@ class Unet(nn.Module):
 			#out_channels = 512, in the paper those channels will be concatenated with the 512 channels from the mirrored step of the descent
 			#kernel_size = 2, from the paper
 			#stride = 2, upsampling of the image, size is 2x what is was before
-			#output_padding = 1, only on first two upconvolution, because last maxpools were on uneven dimensions so we lose 1 pixel
-		self.upconv1 = nn.ConvTranspose2d(1024, 512, 2, 2, output_padding=1)
+		self.upconv1 = nn.ConvTranspose2d(1024, 512, 2, 2)
 		self.conv11 = nn.Conv2d(1024, 512, 3, padding=1)
 		self.conv12 = nn.Conv2d(512, 512, 3, padding=1)
 		
-		self.upconv2 = nn.ConvTranspose2d(512, 256, 2, 2, output_padding=1)
+		self.upconv2 = nn.ConvTranspose2d(512, 256, 2, 2)
 		self.conv13 = nn.Conv2d(512, 256, 3, padding=1)
 		self.conv14 = nn.Conv2d(256, 256, 3, padding=1)
 		
