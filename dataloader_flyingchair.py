@@ -122,5 +122,4 @@ def compute_mean_std(data_dir):
 	return mean, std
 
 #(array([0.3804277 , 0.38884523, 0.3820099 ]), array([0.27410381, 0.28123705, 0.31550989]))
-#data_dir = '/users/Enseignants/bereziat/FlyingChairs/data'
 #print(compute_mean_std(data_dir))
