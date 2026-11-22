@@ -69,6 +69,16 @@ def prediction(model, nb_pred, test_batches, cuda=True):
 
 	model.eval()
 	saved = 0
+	if nb_pred == -1:
+		nb_pred = len(test_batches)
+	print(nb_pred)
+	maes = []
+
+	std_t = torch.tensor([0.27410381, 0.28123705, 0.31550989], dtype=torch.float32).view(3,1,1)
+	mean_t = torch.tensor([0.3804277, 0.38884523, 0.3820099], dtype=torch.float32).view(3,1,1)
+	if cuda:
+		std_t = std_t.cuda()
+		mean_t = mean_t.cuda()
 
 	with torch.no_grad():
 		for inpt, label in test_batches:
@@ -77,72 +87,96 @@ def prediction(model, nb_pred, test_batches, cuda=True):
 				label = label.cuda()
 			output = model(inpt)
 			mse = F.mse_loss(output, label)
-			label_np = label.detach().cpu().numpy()
-			output_np = output.detach().cpu().numpy()
-			batch_size = output_np.shape[0]
+			batch_size = output.shape[0]
 
 			for b in range(batch_size):
 				if saved >= nb_pred:
-					return 
-				image2pred = np.transpose(output_np[b], (1,2,0)) * np.array([0.27410381, 0.28123705, 0.31550989], dtype=np.float32) + np.array([0.3804277, 0.38884523, 0.3820099], dtype=np.float32)
-				label2 = np.transpose(label_np[b], (1,2,0)) * np.array([0.27410381, 0.28123705, 0.31550989], dtype=np.float32) + np.array([0.3804277, 0.38884523, 0.3820099], dtype=np.float32)
-				plt.imsave(f"preds/flowlabel_{saved}.png", np.clip(label2, 0.0, 1.0))
-				plt.imsave(f"preds/flowpred_{saved}.png", np.clip(image2pred, 0.0, 1.0))
+					break 
+				image2pred = output[b] * std_t + mean_t
+				label2 = label[b] * std_t + mean_t
+				#print(type(image2pred), type(label2))
+				label_np = torch.clamp(label2.permute(1, 2, 0), 0.0, 1.0).detach().cpu().numpy()
+				output_np = torch.clamp(image2pred.permute(1, 2, 0), 0.0, 1.0).detach().cpu().numpy()
+				plt.imsave(f"preds/image2label_{saved}.png", label_np)
+				plt.imsave(f"preds/image2pred_{saved}.png", output_np)
+				mae_map = F.l1_loss(image2pred, label2, reduction='none')
+				mae = mae_map.mean().item()
+				mae_map =  torch.clamp(mae_map.permute(1, 2, 0), 0.0, 1.0).detach().cpu().numpy()
+				plt.imsave(f"preds/image2mae_{saved}.png", mae_map)
+				maes.append(mae)
 				saved += 1
 
-def main(data_dir, split_path, batch_size=128, lr=0.001, epochs=10, print_interval=50, cuda=False):
+	return np.array(maes), np.array(maes).mean()
+
+def main(data_dir, split_path, batch_size=128, lr=0.001, epochs=10, print_interval=50, cuda=False, train=False, modelt=None):
 
 	model = unet.Unet()
-	criterion = nn.MSELoss()
-	#optimizer = torch.optim.SGD(model.parameters(), lr=lr)
-	optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+	if modelt:
+		model.load_state_dict(torch.load('unet_advection.pth')) 
+	
+	if train:
+		criterion = nn.MSELoss()
+		#optimizer = torch.optim.SGD(model.parameters(), lr=lr)
+		optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
 	if cuda:
 		cudnn.benchmark = True
 		model = model.cuda()
-		criterion = criterion.cuda()
+		if train:
+			criterion = criterion.cuda()
 
 	dataset = dlfl.CustomImageDataset(data_dir, transform=transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.3804277 , 0.38884523, 0.3820099), (0.27410381, 0.28123705, 0.31550989))]))
-	train_batches, test_batches = dlfl.load_data(dataset, split_path, batch_size)
+	train_batches, test_batches, val_batches = dlfl.load_data(dataset, split_path, batch_size)
 
 	train_losses = []
 	test_losses = []
 
-	for i in range(epochs):
-		print("=================\n=== EPOCH "+str(i+1)+" =====\n=================\n")
-		train_loss = epoch(model, train_batches, criterion, print_interval, optimizer=optimizer, cuda=cuda)
-		test_loss = epoch(model, test_batches, criterion, print_interval, cuda=cuda)
+	if train:
+		for i in range(epochs):
+			print("=================\n=== EPOCH "+str(i+1)+" =====\n=================\n")
+			train_loss = epoch(model, train_batches, criterion, print_interval, optimizer=optimizer, cuda=cuda)
+			test_loss = epoch(model, test_batches, criterion, print_interval, cuda=cuda)
 
-		train_losses.append(train_loss.avg)
-		test_losses.append(test_loss.avg)
+			train_losses.append(train_loss.avg)
+			test_losses.append(test_loss.avg)
 
-		plt.figure()
-		plt.plot(train_losses, label='Train Loss')
-		plt.plot(test_losses, label='Test Loss')
-		plt.xlabel('Epoch')
-		plt.ylabel('Loss')
-		plt.legend()
-		plt.savefig('loss_curve.png')
-		plt.close()
-	prediction(model, 10, test_batches)
-	torch.save(model.state_dict(), 'unet_advection.pth')
+			plt.figure()
+			plt.plot(train_losses, label='Train Loss')
+			plt.plot(test_losses, label='Test Loss')
+			plt.xlabel('Epoch')
+			plt.ylabel('Loss')
+			plt.legend()
+			plt.savefig('preds/loss_curve.png')
+			plt.close()
+		torch.save(model.state_dict(), 'unet_advection.pth')
+	maes, mae = prediction(model, -1, val_batches)
+	print(f"MAE: {mae}")
+	#plt.figure()
+	#plt.bar(len(maes), maes, label=f"Average MAE: {mae}")
+	#plt.xlabel('Image')
+	#plt.ylabel('MAE')
+	#plt.savefig('mae.png')
+	#plt.close()
 
 if __name__ == '__main__':
-#	main(
-#		data_dir = '/users/Enseignants/bereziat/FlyingChairs/data',
-#		split_path = 'FlyingChairs_train_val.txt',
-#		batch_size = 32,
-#		lr = 0.001,
-#		epochs = 15,
-#		print_interval = 50,
-#		cuda=True
-#	)
-	model = unet.Unet()
-	data_dir = '/users/Enseignants/bereziat/FlyingChairs/data'
-	split_path = 'FlyingChairs_train_val.txt'
-	batch_size = 32
-	dataset = dlfl.CustomImageDataset(data_dir, transform=transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.3804277 , 0.38884523, 0.3820099), (0.27410381, 0.28123705, 0.31550989))]))
-
-	train_batches, test_batches = dlfl.load_data(dataset, split_path, batch_size)
-	model.load_state_dict(torch.load('unet_advection.pth')) 
-	prediction(model, 10, test_batches, cuda=False)
+	main(
+		data_dir = '/users/Enseignants/bereziat/FlyingChairs/data',
+		split_path = 'FlyingChairs_train_val.txt',
+		batch_size = 32,
+		lr = 0.001,
+		epochs = 50,
+		print_interval = 50,
+		cuda=True,
+		train=True
+		#train=False,
+		#modelt='unet_advection.pth'
+	)
+#	model = unet.Unet()
+#	data_dir = '/users/Enseignants/bereziat/FlyingChairs/data'
+#	split_path = 'FlyingChairs_train_val.txt'
+#	batch_size = 32
+#	dataset = dlfl.CustomImageDataset(data_dir, transform=transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.3804277 , 0.38884523, 0.3820099), (0.27410381, 0.28123705, 0.31550989))]))
+#
+#	train_batches, test_batches = dlfl.load_data(dataset, split_path, batch_size)
+#	model.load_state_dict(torch.load('unet_advection.pth')) 
+#	prediction(model, 10, test_batches, cuda=False)

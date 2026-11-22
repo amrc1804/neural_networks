@@ -4,6 +4,7 @@ from PIL import Image
 import torch
 from torch.utils.data import Dataset
 from torch.utils.data import DataLoader, Subset
+from torch.utils.data import random_split
 import pandas as pd
 import glob
 import os 
@@ -90,14 +91,16 @@ def load_data(dataset, split_data_path, batch_size, num_workers=4, pin_memory=Tr
 	test_indices = np.where(split_values == 2)[0].tolist()
 
 	train_split = Subset(dataset, train_indices)
-	test_split = Subset(dataset, test_indices)
+	test_val_split = Subset(dataset, test_indices)
+	test_split, val_split  = random_split(test_val_split, [0.5, 0.5])
 
 	persistent = num_workers > 0
 
 	train_batches = DataLoader(train_split, batch_size=batch_size, shuffle=True, num_workers=num_workers, pin_memory=pin_memory, persistent_workers=persistent)
 	test_batches = DataLoader(test_split, batch_size=batch_size, shuffle=False, num_workers=num_workers, pin_memory=pin_memory, persistent_workers=persistent)
+	val_batches = DataLoader(val_split, batch_size=batch_size, shuffle=False, num_workers=num_workers, pin_memory=pin_memory, persistent_workers=persistent)
 
-	return train_batches, test_batches
+	return train_batches, test_batches, val_batches
 
 
 def compute_mean_std(data_dir):
