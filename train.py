@@ -160,7 +160,7 @@ def main(data_dir, split_path, batch_size=128, lr=0.001, epochs=10, print_interv
 
 if __name__ == '__main__':
 	main(
-		data_dir = '/users/Enseignants/bereziat/FlyingChairs/data',
+		data_dir = '',
 		split_path = 'FlyingChairs_train_val.txt',
 		batch_size = 32,
 		lr = 0.001,
@@ -171,12 +171,3 @@ if __name__ == '__main__':
 		#train=False,
 		#modelt='unet_advection.pth'
 	)
-#	model = unet.Unet()
-#	data_dir = '/users/Enseignants/bereziat/FlyingChairs/data'
-#	split_path = 'FlyingChairs_train_val.txt'
-#	batch_size = 32
-#	dataset = dlfl.CustomImageDataset(data_dir, transform=transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.3804277 , 0.38884523, 0.3820099), (0.27410381, 0.28123705, 0.31550989))]))
-#
-#	train_batches, test_batches = dlfl.load_data(dataset, split_path, batch_size)
-#	model.load_state_dict(torch.load('unet_advection.pth')) 
-#	prediction(model, 10, test_batches, cuda=False)
